@@ -1,41 +1,30 @@
 # coding:utf-8
 
+import gevent
+from gevent import monkey
+monkey.patch_all()
+import pymysql
+pymysql.install_as_MySQLdb()
+from gevent.queue import Queue
+from gevent.queue import Empty
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
 from models import metadata, Region, Xiaoqu, Chengjiao
-import time
-
-engine = create_engine('sqlite:///./lianjia.db', echo=False)
-from Queue import Queue
-from Queue import Empty,Full
-import threading
+from LianJiaSpider import do_xiaoqu_spider, xiaoqu_chengjiao_spider
 from optparse import OptionParser
 
-xiaoqu_queue = Queue(maxsize=20)
+engine = create_engine('mysql://root@localhost/lianjia?charset=utf8', echo=False)
 
+xiaoqu_queue = Queue(maxsize=20)
 default_xiaoqu_thread = 10
 
-metadata.create_all(engine )
-Session = scoped_session(sessionmaker(bind=engine,  autoflush=True, autocommit=False))
-
-session_dict = {}
-
-
-def get_session():
-    return Session()
-    '''
-    tid = threading.current_thread().ident
-    if tid not in session_dict:
-        session = Session()
-        session_dict[tid] = session
-    return session_dict[tid]
-    '''
-
-from LianJiaSpider import do_xiaoqu_spider, xiaoqu_chengjiao_spider
+metadata.create_all(engine)
+Session = sessionmaker(bind=engine,  autoflush=True, autocommit=False)
+# Session = scoped_session(sessionmaker(bind=engine,  autoflush=True, autocommit=False))
 
 
 def xiaoqu_callback(res):
-    session = get_session()
+    session = Session()
     for item in res:
         xiaoqu = session.query(Xiaoqu).filter(Xiaoqu.href == item.href).first()
         if not xiaoqu:
@@ -44,14 +33,13 @@ def xiaoqu_callback(res):
 
 
 def get_all_xiaoqu():
-    session = get_session()
+    session = Session()
     regions = session.query(Region).filter(Region.status == 0).all()
     for item in regions:
         try:
             do_xiaoqu_spider(city=item.city, region=item.region, callback=xiaoqu_callback)
-            xiaoqu = session.query(Xiaoqu).fiter(Xiaoqu.id == item.id).first()
-            xiaoqu.status = 1
-            session.add(xiaoqu)
+            item.status = 1
+            session.add(item)
             session.commit()
         except KeyboardInterrupt:
             return
@@ -61,7 +49,7 @@ def get_all_xiaoqu():
 
 
 def add_region(city, region):
-    session = get_session()
+    session = Session()
     r = Region(city=city, region=region, status=0)
     session.add(r)
     session.commit()
@@ -90,6 +78,10 @@ def xiaoqu_worker(thread_no):
         print u"thread[%s] 爬取 %s %s %s" % (thread_no, xiaoqu.region, xiaoqu.name, xiaoqu.href)
         try:
             xiaoqu_chengjiao_spider(xiaoqu.href, xiaoqu.region, chengjiao_callback)
+            item = session.query(Xiaoqu).filter(Xiaoqu.id == xiaoqu.id).first()
+            item.status = 1
+            session.add(item)
+            session.commit()
         except:
             import traceback
             print "thread[%s] %s " % (thread_no, traceback.format_exc())
@@ -107,20 +99,11 @@ def xiaoqu_boss(name=None):
 def get_xiaoqu_chengjiao(worker_num=None, name=None):
     if worker_num is None:
         worker_num = default_xiaoqu_thread
-    threads = [threading.Thread(target=xiaoqu_boss, args=(name, ))]
+    threads = [gevent.spawn(xiaoqu_boss, name)]
     for i in xrange(worker_num):
-        threads.append(threading.Thread(target=xiaoqu_worker, args=(i + 1,)))
-    for th in threads:
-        th.start()
-    for th in threads:
-        while True:
-            try:
-                th.join(2)
-                time.sleep(2)
-                if not th.isAlive():
-                    break
-            except KeyboardInterrupt:
-                exit(1)
+        threads.append(gevent.spawn(xiaoqu_worker, i + 1))
+
+    gevent.joinall(threads)
 
 
 if __name__ == "__main__":

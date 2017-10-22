@@ -33,9 +33,9 @@ class Region(Base):
     __table_args__ = (
         UniqueConstraint("city", "region", name="city_region_unique"),
     )
-    city = Column(String(10), nullable=False)
-    region = Column(String(20), nullable=False)
-    ch_city = Column(String(20), nullable=False, default="")
+    city = Column(String(8), nullable=False)
+    region = Column(String(32), nullable=False)
+    ch_city = Column(String(32), nullable=False, default="")
     status = Column(Integer, nullable=False, default=0)
 
 
@@ -44,12 +44,12 @@ class Xiaoqu(Base):
     __table_args__ = (
         UniqueConstraint("href", name="href_unique"),
     )
-    href = Column(String(256), nullable=False)
-    region = Column(String(20), nullable=False)
-    city = Column(String(10), nullable=False)
-    name = Column(String(20), nullable=False)
-    b_cite = Column(String(20), nullable=False, default="")
-    s_cite = Column(String(20), nullable=False, default="")
+    href = Column(String(128), nullable=False)
+    region = Column(String(32), nullable=False)
+    city = Column(String(8), nullable=False)
+    name = Column(String(32), nullable=False)
+    b_cite = Column(String(32), nullable=False, default="")
+    s_cite = Column(String(32), nullable=False, default="")
     year = Column(Integer, nullable=False, default=0)
     status = Column(Integer, nullable=False, default=0)
 
@@ -60,16 +60,16 @@ class Chengjiao(Base):
     __table_args__ = (
         UniqueConstraint("href", name="href_unique"),
     )
-    href = Column(String(50), nullable=False)
-    region = Column(String(20), nullable=False)
-    city = Column(String(10), nullable=False)
-    xiaoqu = Column(String(20), nullable=False)
-    orientation = Column(String(20), nullable=False, default="")
-    fit_up = Column(String(20), nullable=False, default="")
-    lift = Column(String(20), nullable=False, default="")
-    structure = Column(String(20), nullable=False)
+    href = Column(String(64), nullable=False)
+    region = Column(String(32), nullable=False)
+    city = Column(String(8), nullable=False)
+    xiaoqu = Column(String(32), nullable=False)
+    orientation = Column(String(32), nullable=False, default="")
+    fit_up = Column(String(32), nullable=False, default="")
+    lift = Column(String(32), nullable=False, default="")
+    structure = Column(String(32), nullable=False)
     area = Column(Float, nullable=False)
-    floor = Column(String(20), default="")
+    floor = Column(String(32), default="")
     year = Column(Integer, nullable=False, default=0)
     sign_time = Column(Date, nullable=False)
     unit_price = Column(Float, nullable=False)

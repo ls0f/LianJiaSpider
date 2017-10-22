@@ -115,8 +115,10 @@ def chengjiao_spider(url_page=u"http://bj.lianjia.com/chengjiao/pg1rs%E5%86%A0%E
         content = cj.find('div', {'class': "title"}).text.split()
         obj.xiaoqu = content[0]
         obj.structure = content[1]
-        obj.area = re.findall(r"(\d+\.?\d+)", content[2])[0]
-
+        try:
+            obj.area = re.findall(r"(\d+\.?\d+)", content[2])[0]
+        except IndexError:
+            continue
         house_info = cj.find('div', {"class": "houseInfo"}).text.strip().split("|")
         try:
             obj.orientation = house_info[0]
