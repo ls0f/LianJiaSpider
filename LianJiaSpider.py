@@ -42,7 +42,7 @@ hds = [{'User-Agent': 'Mozilla/5.0 (Windows; U; Windows NT 6.1; en-US; rv:1.9.1.
        {'User-Agent': 'Opera/9.80 (Windows NT 6.1; U; en) Presto/2.8.131 Version/11.11'}]
 
 
-def xiaoqu_spider(url_page):
+def xiaoqu_spider(region, url_page):
     """
     爬取页面链接中的小区信息
     """
@@ -54,14 +54,13 @@ def xiaoqu_spider(url_page):
     xiaoqu_list = soup.find('ul', {'class': 'listContent'}).find_all("li")
     res = []
     for xq in xiaoqu_list:
-        obj = Xiaoqu(city=city)
+        obj = Xiaoqu(city=city, region=region)
         obj.href = xq.find('div', {"class": "title"}).find("a").attrs['href']
         obj.name = xq.find('div', {"class": "title"}).find("a").text
         position_info = xq.find("div", {"class": "positionInfo"}).find_all("a")
         position_text = xq.find("div", {"class": "positionInfo"}).text
         if len(position_info) >= 1:
             obj.b_cite = position_info[0].text
-            obj.region = obj.b_cite
         if len(position_info) >= 2:
             obj.s_cite = position_info[1].text
 
@@ -87,7 +86,7 @@ def do_xiaoqu_spider(city, region, callback=None):
         print u"正在爬取 %s %s %d页" % (city, region, i+1)
         url_page = u"http://" + city + ".lianjia.com/xiaoqu/pg%drs%s/" % (i+1, region)
         print url_page
-        res = xiaoqu_spider(url_page)
+        res = xiaoqu_spider(region, url_page)
         if callback:
             callback(res)
             print "爬取记录 %s" % len(res)
