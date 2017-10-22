@@ -5,229 +5,189 @@
 """
 
 import re
-import urllib2  
-import sqlite3
+import urlparse
+import urllib2
+import json
 import random
 import threading
 from bs4 import BeautifulSoup
 from datetime import datetime
+from models import Chengjiao, row2dict, Xiaoqu
 
-import sys
-reload(sys)
-sys.setdefaultencoding("utf-8")
 
 TIMEOUT = 10
 
-#登录，不登录不能爬取三个月之内的数据
+# 登录，不登录不能爬取三个月之内的数据
 import LianJiaLogIn
 
 
-#Some User Agents
-hds=[{'User-Agent':'Mozilla/5.0 (Windows; U; Windows NT 6.1; en-US; rv:1.9.1.6) Gecko/20091201 Firefox/3.5.6'},\
-    {'User-Agent':'Mozilla/5.0 (Windows NT 6.2) AppleWebKit/535.11 (KHTML, like Gecko) Chrome/17.0.963.12 Safari/535.11'},\
-    {'User-Agent':'Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.2; Trident/6.0)'},\
-    {'User-Agent':'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:34.0) Gecko/20100101 Firefox/34.0'},\
-    {'User-Agent':'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Ubuntu Chromium/44.0.2403.89 Chrome/44.0.2403.89 Safari/537.36'},\
-    {'User-Agent':'Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10_6_8; en-us) AppleWebKit/534.50 (KHTML, like Gecko) Version/5.1 Safari/534.50'},\
-    {'User-Agent':'Mozilla/5.0 (Windows; U; Windows NT 6.1; en-us) AppleWebKit/534.50 (KHTML, like Gecko) Version/5.1 Safari/534.50'},\
-    {'User-Agent':'Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0'},\
-    {'User-Agent':'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.6; rv:2.0.1) Gecko/20100101 Firefox/4.0.1'},\
-    {'User-Agent':'Mozilla/5.0 (Windows NT 6.1; rv:2.0.1) Gecko/20100101 Firefox/4.0.1'},\
-    {'User-Agent':'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_7_0) AppleWebKit/535.11 (KHTML, like Gecko) Chrome/17.0.963.56 Safari/535.11'},\
-    {'User-Agent':'Opera/9.80 (Macintosh; Intel Mac OS X 10.6.8; U; en) Presto/2.8.131 Version/11.11'},\
-    {'User-Agent':'Opera/9.80 (Windows NT 6.1; U; en) Presto/2.8.131 Version/11.11'}]
-    
+# Some User Agents
+hds = [{'User-Agent': 'Mozilla/5.0 (Windows; U; Windows NT 6.1; en-US; rv:1.9.1.6) Gecko/20091201 Firefox/3.5.6'}, \
+       {
+           'User-Agent': 'Mozilla/5.0 (Windows NT 6.2) AppleWebKit/535.11 (KHTML, like Gecko) Chrome/17.0.963.12 Safari/535.11'}, \
+       {'User-Agent': 'Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.2; Trident/6.0)'}, \
+       {'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:34.0) Gecko/20100101 Firefox/34.0'}, \
+       {
+           'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Ubuntu Chromium/44.0.2403.89 Chrome/44.0.2403.89 Safari/537.36'}, \
+       {
+           'User-Agent': 'Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10_6_8; en-us) AppleWebKit/534.50 (KHTML, like Gecko) Version/5.1 Safari/534.50'}, \
+       {
+           'User-Agent': 'Mozilla/5.0 (Windows; U; Windows NT 6.1; en-us) AppleWebKit/534.50 (KHTML, like Gecko) Version/5.1 Safari/534.50'}, \
+       {'User-Agent': 'Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0'}, \
+       {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.6; rv:2.0.1) Gecko/20100101 Firefox/4.0.1'}, \
+       {'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; rv:2.0.1) Gecko/20100101 Firefox/4.0.1'}, \
+       {
+           'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_7_0) AppleWebKit/535.11 (KHTML, like Gecko) Chrome/17.0.963.56 Safari/535.11'}, \
+       {'User-Agent': 'Opera/9.80 (Macintosh; Intel Mac OS X 10.6.8; U; en) Presto/2.8.131 Version/11.11'}, \
+       {'User-Agent': 'Opera/9.80 (Windows NT 6.1; U; en) Presto/2.8.131 Version/11.11'}]
+
 
 def xiaoqu_spider(url_page):
     """
     爬取页面链接中的小区信息
     """
-    try:
-        req = urllib2.Request(url_page, headers=hds[random.randint(0,len(hds)-1)])
-        source_code = urllib2.urlopen(req, timeout=TIMEOUT).read()
-        plain_text= unicode(source_code)#,errors='ignore')
-        soup = BeautifulSoup(plain_text)
-    except (urllib2.HTTPError, urllib2.URLError), e:
-        print e
-        exit(-1)
-    except Exception,e:
-        print e
-        exit(-1)
-    
-    xiaoqu_list=soup.findAll('div',{'class':'info-panel'})
+    p = urlparse.urlparse(url_page)
+    city = p.hostname.split(".")[0]
+    req = urllib2.Request(url_page.encode("utf-8"), headers=hds[random.randint(0, len(hds) - 1)])
+    plain_text = urllib2.urlopen(req, timeout=TIMEOUT).read()
+    soup = BeautifulSoup(plain_text, "html.parser")
+    xiaoqu_list = soup.find('ul', {'class': 'listContent'}).find_all("li")
     res = []
     for xq in xiaoqu_list:
-        info_dict={}
-        info_dict.update({'name':xq.find('a').text})
-        content = unicode(xq.find('div',{'class':'con'}).renderContents().strip())
-        info = re.match(r".+>(.+)</a>.+>(.+)</a>.+</span>(.+)<span>.+</span>(.+)",content)
-        if info:
-            info = info.groups()
-            info_dict.update({'b_cite':info[0]})
-            info_dict.update({'s_cite':info[1]})
-            info_dict.update({'structure':info[2]})
-            try:
-                info_dict.update({'year':re.findall(r"(\d+)", info[3][:4])[0]})
-            except IndexError as e:
-                import traceback
-                print traceback.format_exc()
-                info_dict.update({'year': 0})
+        obj = Xiaoqu(city=city)
+        obj.href = xq.find('div', {"class": "title"}).find("a").attrs['href']
+        obj.name = xq.find('div', {"class": "title"}).find("a").text
+        position_info = xq.find("div", {"class": "positionInfo"}).find_all("a")
+        position_text = xq.find("div", {"class": "positionInfo"}).text
+        if len(position_info) >= 1:
+            obj.b_cite = position_info[0].text
+            obj.region = obj.b_cite
+        if len(position_info) >= 2:
+            obj.s_cite = position_info[1].text
 
-            res.append(info_dict)
+        year = re.findall(u"(\d+)年", position_text)
+        if year:
+            obj.year = year[0]
 
+        res.append(obj)
     return res
 
 
-def do_xiaoqu_spider(city, region):
+def do_xiaoqu_spider(city, region, callback=None):
     """
     爬取大区域中的所有小区信息
     """
-    url=u"http://" + city +".lianjia.com/xiaoqu/rs"+region+"/"
-    try:
-        req = urllib2.Request(url, headers=hds[random.randint(0,len(hds)-1)])
-        source_code = urllib2.urlopen(req,timeout=5).read()
-        plain_text=unicode(source_code)#,errors='ignore')   
-        soup = BeautifulSoup(plain_text)
-    except (urllib2.HTTPError, urllib2.URLError), e:
-        print e
-        return
-    except Exception,e:
-        print e
-        return
-    d="d="+soup.find('div',{'class':'page-box house-lst-page-box'}).get('page-data')
-    exec(d)
-    total_pages=d['totalPage']
-    
-    threads=[]
-    for i in range(total_pages):
-        url_page= u"http://" + city + ".lianjia.com/xiaoqu/pg%drs%s/" % (i+1, region)
-        t=threading.Thread(target=xiaoqu_spider,args=(city, url_page))
-        threads.append(t)
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join()
+    url = u"http://" + city + ".lianjia.com/xiaoqu/rs" + region + "/"
+    req = urllib2.Request(url.encode("utf-8"), headers=hds[random.randint(0, len(hds) - 1)])
+    plain_text = urllib2.urlopen(req, timeout=TIMEOUT).read()
+    soup = BeautifulSoup(plain_text, "html.parser")
+    page_box = json.loads(soup.find('div', {'class': 'page-box house-lst-page-box'}).get("page-data"))
+    total_page = page_box["totalPage"]
+    for i in xrange(total_page):
+        print u"正在爬取 %s %s %d页" % (city, region, i+1)
+        url_page = u"http://" + city + ".lianjia.com/xiaoqu/pg%drs%s/" % (i+1, region)
+        print url_page
+        res = xiaoqu_spider(url_page)
+        if callback:
+            callback(res)
+            print "爬取记录 %s" % len(res)
+
     print u"爬下了 %s 区全部的小区信息" % region
 
 
-def chengjiao_spider(url_page=u"http://bj.lianjia.com/chengjiao/pg1rs%E5%86%A0%E5%BA%AD%E5%9B%AD"):
+def chengjiao_spider(url_page=u"http://bj.lianjia.com/chengjiao/pg1rs%E5%86%A0%E5%BA%AD%E5%9B%AD", region=None):
     """
     爬取页面链接中的成交记录
     """
-    try:
-        req = urllib2.Request(url_page, headers=hds[random.randint(0,len(hds)-1)])
-        source_code = urllib2.urlopen(req, timeout= TIMEOUT).read()
-        plain_text=unicode(source_code)#,errors='ignore')   
-        soup = BeautifulSoup(plain_text)
-    except (urllib2.HTTPError, urllib2.URLError), e:
-        print e
-        exception_write('chengjiao_spider',url_page)
-        return
-    except Exception,e:
-        print e
-        exception_write('chengjiao_spider',url_page)
-        return
-    
-    cj_list=soup.findAll('div',{'class':'info-panel'})
+    p = urlparse.urlparse(url_page)
+    city = p.hostname.split(".")[0]
+    req = urllib2.Request(url_page, headers=hds[random.randint(0, len(hds) - 1)])
+    plain_text = urllib2.urlopen(req, timeout=TIMEOUT).read()
+    soup = BeautifulSoup(plain_text, "html.parser")
+    cj_list = soup.find('ul', {'class': 'listContent'}).find_all('li')
     res = []
     for cj in cj_list:
-        info_dict={}
+        obj = Chengjiao(city=city, region=region or "")
         href = cj.find('a')
         if not href:
             continue
-        info_dict.update({'href':href.attrs['href']})
-        content=cj.find('h2').text.split()
-        if content:
-            info_dict.update({'name':content[0]})
-            info_dict.update({'fang_class':content[1]})
-            info_dict.update({'structure': content[2]})
-        content=unicode(cj.find('div',{'class':'con'}).renderContents().strip())
-        content=content.split('/')
-        if content:
-            info_dict.update({'orientation':content[0].strip()})
-            info_dict.update({'floor':content[1].strip()})
-            if len(content)>=3:
-                content[2]=content[2].strip();
-                info_dict.update({'year':content[2][:4]})
-        content=cj.findAll('div',{'class':'div-cun'})
-        if content:
-            info_dict.update({'sign_time': datetime.strptime(content[0].text, "%Y.%m.%d")})
-            info_dict.update({'unit_price': re.findall(r"(\d+)",content[1].text)[0]})
-            info_dict.update({'total_price':re.findall(r"(\d+\.?\d+)" ,content[2].text)[0]})
-        content=cj.find('div',{'class':'introduce'}).text.strip().split()
-        if content:
-            for c in content:
-                if c.find(u'满')!=-1:
-                    info_dict.update({'fang_class':c})
-                elif c.find(u'学')!=-1:
-                    info_dict.update({'school': c})
-                elif c.find(u'距')!=-1:
-                    info_dict.update({'sub_way': c})
-        
-        res.append(info_dict)
+        obj.href = href.attrs['href']
+        content = cj.find('div', {'class': "title"}).text.split()
+        obj.xiaoqu = content[0]
+        obj.structure = content[1]
+        obj.area = re.findall(r"(\d+\.?\d+)", content[2])[0]
+
+        house_info = cj.find('div', {"class": "houseInfo"}).text.strip().split("|")
+        try:
+            obj.orientation = house_info[0]
+            obj.fit_up = house_info[1]
+            obj.lift = house_info[2]
+        except IndexError:
+            pass
+        deal_date = cj.find('div', {'class': "dealDate"}).text.strip()
+        if u"成交" in deal_date:
+            print u"最近30天成交"
+            continue
+        try:
+            obj.sign_time = datetime.strptime(deal_date, "%Y.%m.%d")
+        except ValueError:
+            obj.sign_time = datetime.strptime(deal_date, "%Y.%m")
+
+        try:
+            obj.total_price = cj.find('div', {'class': "totalPrice"}).find("span", {"class": "number"}).text
+        except AttributeError:
+            print cj.find('div', {'class': "totalPrice"}).text
+            continue
+        if '*' in obj.total_price:
+            continue
+        floor = cj.find("div", {"class": "positionInfo"}).get_text().strip().split()
+        try:
+            obj.floor = floor[0]
+            obj.year = re.findall(r"(\d+)", floor[1])[0]
+        except IndexError:
+            pass
+        obj.unit_price = cj.find('div', {'class': "unitPrice"}).find("span", {"class": "number"}).text
+        house_txt = cj.find("span", {"class": "dealHouseTxt"})
+        if house_txt:
+            obj.house_txt = house_txt.get_text()
+
+        cycle_txt = cj.find("div", {"class": "dealCycleeInfo"})
+        if cycle_txt:
+            obj.cycle_info = cycle_txt.get_text()
+            expect = re.findall(u"(\d+)万", obj.cycle_info)
+            if expect:
+                obj.expect_price = expect[0]
+            deal = re.findall(u"(\d+)天", obj.cycle_info)
+            if deal:
+                obj.deal_days = deal[0]
+
+        res.append(obj)
+
     return res
 
 
-def xiaoqu_chengjiao_spider(city, xq_name=u"冠庭园"):
+def xiaoqu_chengjiao_spider(xiaoqu_href, region, callback=None):
     """
     爬取小区成交记录
     """
-    url=u"http://" + city + ".lianjia.com/chengjiao/rs"+urllib2.quote(xq_name)+"/"
+    p = urlparse.urlparse(xiaoqu_href)
+    xiqoqu_id = re.findall(r"(\d+)", xiaoqu_href)[0]
+    url = "http://%s/chengjiao/c%s" % (p.hostname, xiqoqu_id)
+    req = urllib2.Request(url, headers=hds[random.randint(0, len(hds) - 1)])
+    plain_text = urllib2.urlopen(req, timeout=10).read()
+    soup = BeautifulSoup(plain_text, "html.parser")
     try:
-        req = urllib2.Request(url,headers=hds[random.randint(0,len(hds)-1)])
-        source_code = urllib2.urlopen(req,timeout=10).read()
-        plain_text=unicode(source_code)#,errors='ignore')   
-        soup = BeautifulSoup(plain_text)
-    except (urllib2.HTTPError, urllib2.URLError), e:
-        print e
-        exception_write('xiaoqu_chengjiao_spider',xq_name)
+        page_box = json.loads(soup.find('div', {'class': 'page-box house-lst-page-box'}).get("page-data"))
+        total_page = page_box["totalPage"]
+    except AttributeError:
         return
-    except Exception,e:
-        print e
-        exception_write('xiaoqu_chengjiao_spider',xq_name)
-        return
-    content=soup.find('div',{'class':'page-box house-lst-page-box'})
-    total_pages=0
-    if content:
-        d="d="+content.get('page-data')
-        exec(d)
-        total_pages=d['totalPage']
-    
-    threads=[]
-    for i in range(total_pages):
-        url_page=u"http://" + city + ".lianjia.com/chengjiao/pg%drs%s/" % (i+1,urllib2.quote(xq_name))
-        t=threading.Thread(target=chengjiao_spider,args=(url_page))
-        threads.append(t)
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join()
-
-    
-def do_xiaoqu_chengjiao_spider(db_xq,db_cj):
-    """
-    批量爬取小区成交记录
-    """
-    count=0
-    xq_list=db_xq.fetchall()
-    for xq in xq_list:
-        xiaoqu_chengjiao_spider(db_cj,xq[0])
-        count+=1
-        print 'have spidered %d xiaoqu' % count
-    print 'done'
+    for i in range(total_page):
+        url_page = "http://%s/chengjiao/pg%dc%s" % (p.hostname, i+1, xiqoqu_id)
+        print u"正在爬取 %d/%d %s" % (i+1, total_page, url_page)
+        res = chengjiao_spider(url_page, region)
+        if callback:
+            callback(res)
 
 
-
-
-if __name__=="__main__":
-
-    #爬下所有的小区信息
-    for region in regions:
-        do_xiaoqu_spider(db_xq, region)
-    
-    #爬下所有小区里的成交信息
-    do_xiaoqu_chengjiao_spider(db_xq,db_cj)
-
-    #重新爬取爬取异常的链接
-    exception_spider(db_cj)
-
+if __name__ == "__main__":
+    pass

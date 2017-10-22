@@ -7,6 +7,14 @@ from sqlalchemy.ext.declarative import as_declarative
 from sqlalchemy.schema import MetaData, UniqueConstraint
 from sqlalchemy import (Column, DateTime, String, Integer, Float, Date)
 
+
+def row2dict(row):
+    d = {}
+    for column in row.__table__.columns:
+        d[column.name] = getattr(row, column.name)
+
+    return d
+
 metadata = MetaData()
 
 
@@ -28,21 +36,22 @@ class Region(Base):
     city = Column(String(10), nullable=False)
     region = Column(String(20), nullable=False)
     ch_city = Column(String(20), nullable=False, default="")
+    status = Column(Integer, nullable=False, default=0)
 
 
 class Xiaoqu(Base):
     __tablename__ = 'xiaoqu'
     __table_args__ = (
-        UniqueConstraint("region_id", "name", name="region_name_unique"),
+        UniqueConstraint("href", name="href_unique"),
     )
-    region_id = Column(Integer, nullable=False)
+    href = Column(String(256), nullable=False)
     region = Column(String(20), nullable=False)
     city = Column(String(10), nullable=False)
     name = Column(String(20), nullable=False)
-    b_cite = Column(String(20), nullable=False)
-    s_cite = Column(String(20), nullable=False)
-    structure = Column(String(20), nullable=False)
-    year = Column(Integer, nullable=False)
+    b_cite = Column(String(20), nullable=False, default="")
+    s_cite = Column(String(20), nullable=False, default="")
+    year = Column(Integer, nullable=False, default=0)
+    status = Column(Integer, nullable=False, default=0)
 
 
 class Chengjiao(Base):
@@ -54,15 +63,18 @@ class Chengjiao(Base):
     href = Column(String(50), nullable=False)
     region = Column(String(20), nullable=False)
     city = Column(String(10), nullable=False)
-    name = Column(String(20), nullable=False)
+    xiaoqu = Column(String(20), nullable=False)
+    orientation = Column(String(20), nullable=False, default="")
+    fit_up = Column(String(20), nullable=False, default="")
+    lift = Column(String(20), nullable=False, default="")
     structure = Column(String(20), nullable=False)
     area = Column(Float, nullable=False)
-    orientation = Column(String(20), nullable=False, default="")
     floor = Column(String(20), default="")
-    year = Column(Integer, nullable=False)
+    year = Column(Integer, nullable=False, default=0)
     sign_time = Column(Date, nullable=False)
     unit_price = Column(Float, nullable=False)
     total_price = Column(Float, nullable=False)
-    fang_class = Column(String(20), default="")
-    school = Column(String(20), default="")
-    subway = Column(String(100), default="")
+    house_txt = Column(String(512), nullable=False, default="")
+    cycle_info = Column(String(512), nullable=False, default="")
+    expect_price = Column(Integer, nullable=False, default=0)
+    deal_days = Column(Integer, nullable=False, default=0)
